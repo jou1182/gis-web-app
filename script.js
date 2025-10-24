@@ -59,8 +59,9 @@ function handleLogin(e) {
 function showApp() {
     document.getElementById('loginModal').classList.add('hidden');
     document.getElementById('appContainer').classList.remove('hidden');
-    initializeMap();
-    attachEventListeners();
+    // ** يتم استدعاء الدالتين بالترتيب **
+    initializeMap();        // 1. تهيئة الخريطة
+    attachEventListeners(); // 2. ربط الأزرار (لن تعمل إذا فشلت الدالة السابقة)
 }
 
 function handleLogout() {
@@ -83,31 +84,43 @@ function handleLogout() {
 // Map Initialization
 // ============================================
 
+/**
+ * ## هذه هي الدالة التي تم إصلاحها ##
+ */
 function initializeMap() {
     // Create map
     map = L.map('map').setView(CONFIG.DEFAULT_CENTER, CONFIG.DEFAULT_ZOOM);
 
-    // Add satellite tile layer
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    // --- (بداية الإصلاح) ---
+    // تعريف الطبقات أولاً وتخزينها في متغيرات
+
+    // 1. طبقة الصور الجوية
+    const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: '© Esri, DigitalGlobe, Earthstar Geographics',
         maxZoom: 20,
         minZoom: 2
-    }).addTo(map);
+    });
 
-    // Add street tile layer as alternative
+    // 2. طبقة خريطة الشارع
     const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors',
         maxZoom: 19,
         minZoom: 2
     });
 
+    // إضافة الطبقة الافتراضية (الجوية) إلى الخريطة
+    satelliteLayer.addTo(map);
+
     // Layer control
+    // تمرير المتغيرات (Layer Objects) مباشرة إلى أداة التحكم
     const baseLayers = {
-        '🛰️ صور جوية': map.getPane('tilePane').parentElement.querySelector('img')?.parentElement || L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'),
+        '🛰️ صور جوية': satelliteLayer,
         '🗺️ خريطة الشارع': streetLayer
     };
-
+    
     L.control.layers(baseLayers, {}, { position: 'topleft' }).addTo(map);
+    // --- (نهاية الإصلاح) ---
+
 
     // Add zoom control
     L.control.zoom({ position: 'topleft' }).addTo(map);
@@ -168,7 +181,14 @@ function handleFileUpload(files) {
         if (file.name.endsWith('.geojson') || file.name.endsWith('.json')) {
             handleGeoJSON(file, statusDiv);
         } else if (file.name.endsWith('.zip')) {
+            // هذا لملفات Shapefile
             handleShapefile(file, statusDiv);
+        } else if (file.name.endsWith('.kml')) {
+            // هذا لملفات KML
+            handleKML(file, statusDiv);
+        } else if (file.name.endsWith('.kmz')) {
+            // هذا لملفات KMZ
+            handleKMZ(file, statusDiv);
         }
     });
 }
@@ -213,6 +233,77 @@ function handleShapefile(file, statusDiv) {
             });
         } catch (error) {
             statusDiv.textContent = `❌ خطأ في قراءة الملف: ${error.message}`;
+            statusDiv.classList.add('error');
+            statusDiv.classList.remove('success');
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+
+/**
+ * يعالج ملفات KML
+ */
+function handleKML(file, statusDiv) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const kmlText = e.target.result;
+            const parser = new DOMParser();
+            const kmlDom = parser.parseFromString(kmlText, 'text/xml');
+            
+            // تحويل KML DOM إلى GeoJSON
+            const geojson = toGeoJSON.kml(kmlDom);
+            
+            addGeoJSONLayer(geojson, file.name);
+            statusDiv.textContent = `✅ تم تحميل ${file.name} بنجاح`;
+            statusDiv.classList.remove('error');
+            statusDiv.classList.add('success');
+        } catch (error) {
+            statusDiv.textContent = `❌ خطأ في معالجة ${file.name}: ${error.message}`;
+            statusDiv.classList.add('error');
+            statusDiv.classList.remove('success');
+        }
+    };
+    reader.readAsText(file);
+}
+
+/**
+ * يعالج ملفات KMZ
+ */
+function handleKMZ(file, statusDiv) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            // استخدام JSZip لفك ضغط الملف
+            JSZip.loadAsync(e.target.result).then(zip => {
+                // البحث عن أول ملف .kml داخل الـ KMZ
+                const kmlFile = zip.file(/\.kml$/i)[0];
+                
+                if (kmlFile) {
+                    // قراءة ملف KML كنص
+                    kmlFile.async('string').then(kmlText => {
+                        const parser = new DOMParser();
+                        const kmlDom = parser.parseFromString(kmlText, 'text/xml');
+                        
+                        // تحويل KML DOM إلى GeoJSON
+                        const geojson = toGeoJSON.kml(kmlDom);
+                        
+                        addGeoJSONLayer(geojson, file.name);
+                        statusDiv.textContent = `✅ تم تحميل ${file.name} بنجاح`;
+                        statusDiv.classList.remove('error');
+                        statusDiv.classList.add('success');
+                    });
+                } else {
+                    throw new Error('لم يتم العثور على ملف KML داخل ملف KMZ.');
+                }
+            }).catch(error => {
+                 statusDiv.textContent = `❌ خطأ في معالجة ${file.name}: ${error.message}`;
+                statusDiv.classList.add('error');
+                statusDiv.classList.remove('success');
+            });
+        } catch (error) {
+            statusDiv.textContent = `❌ خطأ في قراءة ${file.name}: ${error.message}`;
             statusDiv.classList.add('error');
             statusDiv.classList.remove('success');
         }
@@ -378,7 +469,7 @@ function handleMapClick(e) {
             layerData.layer.eachLayer(layer => {
                 if (layer.getLatLng && layer.getLatLng().equals(e.latlng)) {
                     foundFeature = true;
-                }
+KA                }
             });
         }
     });
@@ -428,4 +519,3 @@ function shareLink() {
 document.addEventListener('DOMContentLoaded', () => {
     initializeAuth();
 });
-

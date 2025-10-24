@@ -5,33 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تطبيق عارض نظم المعلومات الجغرافية - GIS Viewer</title>
     
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
     
-    <!-- Leaflet Draw CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-draw/1.0.4/leaflet.draw.min.css" />
     
-    <!-- Leaflet Fullscreen CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-fullscreen/2.4.5/Control.FullScreen.min.css" />
     
-    <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-    
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-draw/1.0.4/leaflet.draw.min.js"></script>
-    
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-fullscreen/2.4.5/Control.FullScreen.min.js"></script>
-    
-<script src="https://cdn.jsdelivr.net/npm/shpjs@latest/dist/shp.min.js"></script>
-    
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/togeojson/0.16.0/togeojson.min.js"></script>
-
-<script src="script.js"></script>
 </head>
 <body>
-    <!-- Login Modal -->
     <div id="loginModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -56,9 +38,7 @@
         </div>
     </div>
 
-    <!-- Main Application -->
     <div id="appContainer" class="hidden">
-        <!-- Header -->
         <header class="header">
             <div class="header-content">
                 <h1>📍 تطبيق عارض نظم المعلومات الجغرافية</h1>
@@ -68,23 +48,19 @@
             </div>
         </header>
 
-        <!-- Main Container -->
         <div class="main-container">
-            <!-- Sidebar -->
             <aside class="sidebar">
                 <div class="sidebar-content">
-                    <!-- File Upload Section -->
                     <div class="section">
                         <h3>📁 رفع البيانات</h3>
                         <div class="upload-area" id="uploadArea">
-                            <p>اسحب ملفات GeoJSON أو Shapefile هنا</p>
+                            <p>اسحب ملفات GeoJSON, Shapefile, KML, KMZ هنا</p>
                             <p class="small-text">أو اضغط لاختيار ملف</p>
-                            <input type="file" id="fileInput" multiple accept=".geojson,.json,.zip,.shp,.dbf,.shx" style="display: none;">
+                            <input type="file" id="fileInput" multiple accept=".geojson,.json,.zip,.shp,.dbf,.shx,.kml,.kmz" style="display: none;">
                         </div>
                         <div id="uploadStatus" class="upload-status"></div>
                     </div>
 
-                    <!-- Layers Section -->
                     <div class="section">
                         <h3>🗺️ الطبقات</h3>
                         <div id="layersList" class="layers-list">
@@ -92,14 +68,12 @@
                         </div>
                     </div>
 
-                    <!-- Share Section -->
                     <div class="section">
                         <h3>🔗 المشاركة</h3>
                         <button id="shareBtn" class="btn-share">نسخ رابط المشاركة</button>
                         <div id="shareStatus" class="share-status"></div>
                     </div>
 
-                    <!-- Map Controls Section -->
                     <div class="section">
                         <h3>🎮 التحكم</h3>
                         <button id="zoomInBtn" class="btn-control">تكبير (+)</button>
@@ -108,7 +82,6 @@
                         <button id="clearLayersBtn" class="btn-control btn-danger">حذف جميع الطبقات</button>
                     </div>
 
-                    <!-- Legend Section -->
                     <div class="section">
                         <h3>📋 معلومات الطبقة</h3>
                         <div id="featureInfo" class="feature-info">
@@ -118,27 +91,24 @@
                 </div>
             </aside>
 
-            <!-- Map Container -->
             <main class="map-container">
                 <div id="map" class="map"></div>
             </main>
         </div>
     </div>
 
-    <!-- Leaflet JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     
-    <!-- Leaflet Draw JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-draw/1.0.4/leaflet.draw.min.js"></script>
     
-    <!-- Leaflet Fullscreen JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-fullscreen/2.4.5/Control.FullScreen.min.js"></script>
     
-    <!-- Shapefile Parser (shpjs) -->
     <script src="https://cdn.jsdelivr.net/npm/shpjs@latest/dist/shp.min.js"></script>
     
-    <!-- Custom JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/togeojson/0.16.0/togeojson.min.js"></script>
+    
     <script src="script.js"></script>
 </body>
 </html>
-

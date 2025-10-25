@@ -12,16 +12,17 @@ const CONFIG = {
     // Default Map Center (Cairo, Egypt)
     DEFAULT_CENTER: [30.0444, 31.2357],
     DEFAULT_ZOOM: 5,
-    // Colors for layers
-    COLORS: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE']
 };
 
 // Global Variables
 let map = null;
 let layers = {};
-let layerColors = {};
-let currentLayerIndex = 0;
 let isAuthenticated = false;
+
+// ## متغيرات جديدة لتخزين الطبقة مؤقتاً قبل اختيار النمط ##
+let tempGeoJSON = null;
+let tempLayerName = '';
+
 
 // ============================================
 // Authentication System
@@ -59,9 +60,8 @@ function handleLogin(e) {
 function showApp() {
     document.getElementById('loginModal').classList.add('hidden');
     document.getElementById('appContainer').classList.remove('hidden');
-    // ** يتم استدعاء الدالتين بالترتيب **
-    initializeMap();        // 1. تهيئة الخريطة
-    attachEventListeners(); // 2. ربط الأزرار (لن تعمل إذا فشلت الدالة السابقة)
+    initializeMap();
+    attachEventListeners();
 }
 
 function handleLogout() {
@@ -77,22 +77,15 @@ function handleLogout() {
         map = null;
     }
     layers = {};
-    layerColors = {};
 }
 
 // ============================================
 // Map Initialization
 // ============================================
 
-/**
- * ## هذه هي الدالة التي تم إصلاحها ##
- */
 function initializeMap() {
     // Create map
     map = L.map('map').setView(CONFIG.DEFAULT_CENTER, CONFIG.DEFAULT_ZOOM);
-
-    // --- (بداية الإصلاح) ---
-    // تعريف الطبقات أولاً وتخزينها في متغيرات
 
     // 1. طبقة الصور الجوية
     const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -112,15 +105,12 @@ function initializeMap() {
     satelliteLayer.addTo(map);
 
     // Layer control
-    // تمرير المتغيرات (Layer Objects) مباشرة إلى أداة التحكم
     const baseLayers = {
         '🛰️ صور جوية': satelliteLayer,
         '🗺️ خريطة الشارع': streetLayer
     };
     
     L.control.layers(baseLayers, {}, { position: 'topleft' }).addTo(map);
-    // --- (نهاية الإصلاح) ---
-
 
     // Add zoom control
     L.control.zoom({ position: 'topleft' }).addTo(map);
@@ -166,6 +156,9 @@ function attachEventListeners() {
     document.getElementById('resetMapBtn').addEventListener('click', resetMap);
     document.getElementById('clearLayersBtn').addEventListener('click', clearAllLayers);
     document.getElementById('shareBtn').addEventListener('click', shareLink);
+
+    // ## ربط زر نافذة اختيار النمط ##
+    document.getElementById('styleForm').addEventListener('submit', handleStyleSubmit);
 }
 
 // ============================================
@@ -177,20 +170,23 @@ function handleFileUpload(files) {
     statusDiv.textContent = '⏳ جاري معالجة الملفات...';
     statusDiv.classList.add('success');
 
-    Array.from(files).forEach(file => {
-        if (file.name.endsWith('.geojson') || file.name.endsWith('.json')) {
-            handleGeoJSON(file, statusDiv);
-        } else if (file.name.endsWith('.zip')) {
-            // هذا لملفات Shapefile
-            handleShapefile(file, statusDiv);
-        } else if (file.name.endsWith('.kml')) {
-            // هذا لملفات KML
-            handleKML(file, statusDiv);
-        } else if (file.name.endsWith('.kmz')) {
-            // هذا لملفات KMZ
-            handleKMZ(file, statusDiv);
-        }
-    });
+    // نأخذ ملف واحد فقط في كل مرة لإظهار نافذة النمط
+    const file = files[0];
+    if (!file) return;
+
+    if (file.name.endsWith('.geojson') || file.name.endsWith('.json')) {
+        handleGeoJSON(file, statusDiv);
+    } else if (file.name.endsWith('.zip')) {
+        handleShapefile(file, statusDiv);
+    } else if (file.name.endsWith('.kml')) {
+        handleKML(file, statusDiv);
+    } else if (file.name.endsWith('.kmz')) {
+        handleKMZ(file, statusDiv);
+    } else {
+         statusDiv.textContent = `❌ صيغة ملف غير مدعومة: ${file.name}`;
+         statusDiv.classList.add('error');
+         statusDiv.classList.remove('success');
+    }
 }
 
 function handleGeoJSON(file, statusDiv) {
@@ -198,8 +194,13 @@ function handleGeoJSON(file, statusDiv) {
     reader.onload = (e) => {
         try {
             const geojson = JSON.parse(e.target.result);
-            addGeoJSONLayer(geojson, file.name);
-            statusDiv.textContent = `✅ تم تحميل ${file.name} بنجاح`;
+            
+            // ## تعديل: إظهار نافذة النمط بدلاً من الإضافة المباشرة ##
+            tempGeoJSON = geojson;
+            tempLayerName = file.name;
+            showStyleModal(file.name);
+            
+            statusDiv.textContent = `✅ تم اختيار ${file.name}، يرجى تحديد النمط.`;
             statusDiv.classList.remove('error');
             statusDiv.classList.add('success');
         } catch (error) {
@@ -216,14 +217,17 @@ function handleShapefile(file, statusDiv) {
     reader.onload = (e) => {
         try {
             shp(e.target.result).then(data => {
-                // Handle both single and multiple features
                 const geojson = Array.isArray(data) ? {
                     type: 'FeatureCollection',
                     features: data.flatMap(d => d.features || [d])
                 } : data;
                 
-                addGeoJSONLayer(geojson, file.name.replace('.zip', ''));
-                statusDiv.textContent = `✅ تم تحميل ${file.name} بنجاح`;
+                // ## تعديل: إظهار نافذة النمط بدلاً من الإضافة المباشرة ##
+                tempGeoJSON = geojson;
+                tempLayerName = file.name.replace('.zip', '');
+                showStyleModal(tempLayerName);
+
+                statusDiv.textContent = `✅ تم اختيار ${file.name}، يرجى تحديد النمط.`;
                 statusDiv.classList.remove('error');
                 statusDiv.classList.add('success');
             }).catch(error => {
@@ -241,9 +245,6 @@ function handleShapefile(file, statusDiv) {
 }
 
 
-/**
- * يعالج ملفات KML
- */
 function handleKML(file, statusDiv) {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -252,11 +253,14 @@ function handleKML(file, statusDiv) {
             const parser = new DOMParser();
             const kmlDom = parser.parseFromString(kmlText, 'text/xml');
             
-            // تحويل KML DOM إلى GeoJSON
             const geojson = toGeoJSON.kml(kmlDom);
             
-            addGeoJSONLayer(geojson, file.name);
-            statusDiv.textContent = `✅ تم تحميل ${file.name} بنجاح`;
+            // ## تعديل: إظهار نافذة النمط بدلاً من الإضافة المباشرة ##
+            tempGeoJSON = geojson;
+            tempLayerName = file.name;
+            showStyleModal(file.name);
+
+            statusDiv.textContent = `✅ تم اختيار ${file.name}، يرجى تحديد النمط.`;
             statusDiv.classList.remove('error');
             statusDiv.classList.add('success');
         } catch (error) {
@@ -268,29 +272,25 @@ function handleKML(file, statusDiv) {
     reader.readAsText(file);
 }
 
-/**
- * يعالج ملفات KMZ
- */
 function handleKMZ(file, statusDiv) {
     const reader = new FileReader();
     reader.onload = (e) => {
         try {
-            // استخدام JSZip لفك ضغط الملف
             JSZip.loadAsync(e.target.result).then(zip => {
-                // البحث عن أول ملف .kml داخل الـ KMZ
                 const kmlFile = zip.file(/\.kml$/i)[0];
                 
                 if (kmlFile) {
-                    // قراءة ملف KML كنص
                     kmlFile.async('string').then(kmlText => {
                         const parser = new DOMParser();
                         const kmlDom = parser.parseFromString(kmlText, 'text/xml');
-                        
-                        // تحويل KML DOM إلى GeoJSON
                         const geojson = toGeoJSON.kml(kmlDom);
                         
-                        addGeoJSONLayer(geojson, file.name);
-                        statusDiv.textContent = `✅ تم تحميل ${file.name} بنجاح`;
+                        // ## تعديل: إظهار نافذة النمط بدلاً من الإضافة المباشرة ##
+                        tempGeoJSON = geojson;
+                        tempLayerName = file.name;
+                        showStyleModal(file.name);
+
+                        statusDiv.textContent = `✅ تم اختيار ${file.name}، يرجى تحديد النمط.`;
                         statusDiv.classList.remove('error');
                         statusDiv.classList.add('success');
                     });
@@ -312,32 +312,79 @@ function handleKMZ(file, statusDiv) {
 }
 
 // ============================================
+// ## دوال جديدة خاصة بنافذة اختيار النمط ##
+// ============================================
+
+/**
+ * إظهار نافذة اختيار النمط
+ */
+function showStyleModal(layerName) {
+    document.getElementById('styleLayerName').textContent = layerName;
+    document.getElementById('styleModal').classList.remove('hidden');
+}
+
+/**
+ * معالجة إرسال النمط وإضافة الطبقة
+ */
+function handleStyleSubmit(e) {
+    e.preventDefault();
+    
+    // جلب الأنماط من النافذة
+    const style = {
+        color: document.getElementById('layerColor').value,
+        weight: parseInt(document.getElementById('layerWeight').value, 10),
+        fillOpacity: parseFloat(document.getElementById('layerOpacity').value),
+        radius: parseInt(document.getElementById('pointRadius').value, 10)
+    };
+
+    // استخدام البيانات المؤقتة المخزنة
+    if (tempGeoJSON) {
+        addGeoJSONLayer(tempGeoJSON, tempLayerName, style);
+    }
+    
+    // إخفاء النافذة وإعادة تعيين المتغيرات
+    document.getElementById('styleModal').classList.add('hidden');
+    tempGeoJSON = null;
+    tempLayerName = '';
+}
+
+
+// ============================================
 // GeoJSON Layer Management
 // ============================================
 
-function addGeoJSONLayer(geojson, layerName) {
-    const color = CONFIG.COLORS[currentLayerIndex % CONFIG.COLORS.length];
+/**
+ * ## تم تعديل هذه الدالة بالكامل ##
+ * لتقبل الأنماط المخصصة
+ */
+function addGeoJSONLayer(geojson, layerName, customStyle) {
+    
     const layerId = `layer_${Date.now()}`;
+    const layerColor = customStyle.color; // اللون الذي اختاره المستخدم
 
     const geoJSONLayer = L.geoJSON(geojson, {
-        style: {
-            color: color,
-            weight: 2,
-            opacity: 0.8,
-            fillOpacity: 0.5
+        style: (feature) => {
+            // هذا النمط سيطبق على الخطوط والمضلعات
+            return {
+                color: customStyle.color,
+                weight: customStyle.weight,
+                opacity: 0.8,
+                fillOpacity: customStyle.fillOpacity
+            };
         },
         pointToLayer: (feature, latlng) => {
+            // هذا النمط سيطبق على النقاط
             return L.circleMarker(latlng, {
-                radius: 6,
-                fillColor: color,
-                color: '#fff',
-                weight: 2,
+                radius: customStyle.radius,
+                fillColor: customStyle.color,
+                color: '#fff', // حدود بيضاء للنقطة
+                weight: 1,
                 opacity: 1,
                 fillOpacity: 0.8
             });
         },
         onEachFeature: (feature, layer) => {
-            // Create popup with properties
+            // إنشاء نافذة منبثقة بالبيانات
             let popupContent = `<strong>${layerName}</strong><br>`;
             if (feature.properties) {
                 Object.entries(feature.properties).forEach(([key, value]) => {
@@ -346,29 +393,26 @@ function addGeoJSONLayer(geojson, layerName) {
             }
             layer.bindPopup(popupContent);
 
-            // Click event for feature info
+            // إظهار البيانات في الشريط الجانبي عند النقر
             layer.on('click', (e) => {
                 displayFeatureInfo(feature.properties, layerName);
             });
         }
     }).addTo(map);
 
-    // Store layer
+    // تخزين الطبقة
     layers[layerId] = {
         name: layerName,
         layer: geoJSONLayer,
         visible: true,
-        color: color,
+        color: layerColor, // لحفظ اللون المختار
         geojson: geojson
     };
 
-    layerColors[layerId] = color;
-    currentLayerIndex++;
-
-    // Update layers list
+    // تحديث قائمة الطبقات
     updateLayersList();
 
-    // Fit bounds to new layer
+    // تقريب الخريطة إلى حدود الطبقة الجديدة
     if (geoJSONLayer.getBounds().isValid()) {
         map.fitBounds(geoJSONLayer.getBounds(), { padding: [50, 50] });
     }
@@ -386,6 +430,7 @@ function updateLayersList() {
     Object.entries(layers).forEach(([layerId, layerData]) => {
         const layerItem = document.createElement('div');
         layerItem.className = 'layer-item';
+        // استخدام اللون المختار من المستخدم
         layerItem.innerHTML = `
             <span class="layer-name" style="border-right: 4px solid ${layerData.color}; padding-right: 8px;">
                 ${layerData.name}
@@ -417,7 +462,6 @@ function deleteLayer(layerId) {
     if (layers[layerId]) {
         map.removeLayer(layers[layerId].layer);
         delete layers[layerId];
-        delete layerColors[layerId];
         updateLayersList();
         document.getElementById('featureInfo').innerHTML = '<p class="empty-message">انقر على عنصر في الخريطة لعرض معلوماته</p>';
     }
@@ -429,8 +473,6 @@ function clearAllLayers() {
             map.removeLayer(layers[layerId].layer);
         });
         layers = {};
-        layerColors = {};
-        currentLayerIndex = 0;
         updateLayersList();
         document.getElementById('featureInfo').innerHTML = '<p class="empty-message">انقر على عنصر في الخريطة لعرض معلوماته</p>';
     }
@@ -467,14 +509,18 @@ function handleMapClick(e) {
     Object.values(layers).forEach(layerData => {
         if (layerData.visible) {
             layerData.layer.eachLayer(layer => {
-                if (layer.getLatLng && layer.getLatLng().equals(e.latlng)) {
+                // محاولة التحقق بطريقة أكثر مرونة
+                if (layer.contains && layer.contains(e.latlng)) {
+                     foundFeature = true;
+                } else if (layer.getLatLng && layer.getLatLng().equals(e.latlng)) {
                     foundFeature = true;
-KA                }
+                }
             });
         }
     });
 
     if (!foundFeature) {
+        // إخفاء بيانات الطبقة فقط إذا لم يتم النقر على أي عنصر
         document.getElementById('featureInfo').innerHTML = '<p class="empty-message">انقر على عنصر في الخريطة لعرض معلوماته</p>';
     }
 }

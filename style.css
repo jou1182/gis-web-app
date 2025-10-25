@@ -20,7 +20,7 @@ html, body {
     display: none !important;
 }
 
-/* Login Modal */
+/* Login Modal & Style Modal */
 .modal {
     position: fixed;
     top: 0;
@@ -83,6 +83,18 @@ html, body {
     font-size: 14px;
     transition: border-color 0.3s;
 }
+
+/* Style for color picker */
+.form-group input[type="color"] {
+    height: 40px;
+    padding: 5px;
+}
+
+/* Style for range slider */
+.form-group input[type="range"] {
+    padding: 0;
+}
+
 
 .form-group input:focus {
     outline: none;
@@ -433,6 +445,17 @@ html, body {
     direction: ltr;
 }
 
+/* ## هذا هو الإصلاح لمشكلة تبديل الخرائط ## */
+.leaflet-control-layers {
+    direction: ltr;
+    text-align: left;
+}
+.leaflet-control-layers-base label {
+    direction: rtl; /* لإبقاء النص عربي بجانب الزر */
+    padding-right: 5px;
+}
+
+
 .leaflet-top,
 .leaflet-bottom {
     z-index: 100;
@@ -533,4 +556,3 @@ html, body {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
-

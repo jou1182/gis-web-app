@@ -38,6 +38,37 @@
         </div>
     </div>
 
+    <div id="styleModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🎨 تخصيص نمط الطبقة</h2>
+            </div>
+            <div class="modal-body">
+                <p>يرجى اختيار النمط للطبقة: <strong id="styleLayerName"></strong></p>
+                <form id="styleForm">
+                    <div class="form-group">
+                        <label for="layerColor">لون الخط/التعبئة:</label>
+                        <input type="color" id="layerColor" name="layerColor" value="#FF6B6B">
+                    </div>
+                    <div class="form-group">
+                        <label for="layerWeight">سماكة الخط (لخطوط والمضلعات):</label>
+                        <input type="number" id="layerWeight" name="layerWeight" value="2" min="1" max="10">
+                    </div>
+                    <div class="form-group">
+                        <label for="layerOpacity">شفافية التعبئة (للمضلعات 0-1):</label>
+                        <input type="range" id="layerOpacity" name="layerOpacity" value="0.5" min="0" max="1" step="0.1">
+                    </div>
+                     <div class="form-group">
+                        <label for="pointRadius">حجم النقطة (للنقاط):</label>
+                        <input type="number" id="pointRadius" name="pointRadius" value="6" min="1" max="20">
+                    </div>
+                    <button type="submit" class="btn-login">إضافة الطبقة</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
     <div id="appContainer" class="hidden">
         <header class="header">
             <div class="header-content">
